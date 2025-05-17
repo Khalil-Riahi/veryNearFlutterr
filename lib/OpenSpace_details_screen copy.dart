@@ -7,23 +7,42 @@ import 'web_view_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 
-class OfficeRoomReservationScreen extends StatefulWidget {
+class OpenSpaceReservationScreen extends StatefulWidget {
+  // final Map<String, dynamic> room;
+  // final List<Map<String, dynamic>> reservations;
+
+  // const OpenSpaceReservationScreen({
+  //   Key? key,
+  //   required this.room,
+  //   required this.reservations,
+  // }) : super(key: key);
+
   final Map<String, dynamic> room;
   final List<Map<String, dynamic>> reservations;
 
-  const OfficeRoomReservationScreen({
+  /// new parameters ↓
+  final DateTime? initialDate;
+  final String?   initialCheckIn;
+  final String?   initialCheckOut;
+
+  const OpenSpaceReservationScreen({
     Key? key,
     required this.room,
     required this.reservations,
+    this.initialDate,
+    this.initialCheckIn,
+    this.initialCheckOut,
   }) : super(key: key);
 
   @override
-  _OfficeRoomReservationScreenState createState() =>
-      _OfficeRoomReservationScreenState();
+  _OpenSpaceReservationScreenState createState() =>
+      _OpenSpaceReservationScreenState();
 }
 
-class _OfficeRoomReservationScreenState
-    extends State<OfficeRoomReservationScreen> {
+class _OpenSpaceReservationScreenState
+    extends State<OpenSpaceReservationScreen> {
+  CalendarFormat _calendarFmt = CalendarFormat.month;
+
   DateTime get nowInTunisia =>
       DateTime.now().toUtc().add(const Duration(hours: 1));
 
@@ -50,17 +69,112 @@ class _OfficeRoomReservationScreenState
     const Color(0xFF718096), // Light Text (unchanged, you can adjust this)
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _generateTimeSlots();
-    _initializePreferences();
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ));
-    print(widget.reservations);
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _generateTimeSlots();
+  //   _initializePreferences();
+  //   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+  //     statusBarColor: Colors.transparent,
+  //     statusBarIconBrightness: Brightness.dark,
+  //   ));
+  //   print(widget.reservations);
+  // }
+
+//   @override
+// void initState() {
+//   super.initState();
+
+//   // 1) Seed from the caller if they passed an initial date/time
+//   selectedDate  = widget.initialDate;
+//   checkInTime   = widget.initialCheckIn;
+//   checkOutTime  = widget.initialCheckOut;
+//   // Make sure the calendar is focused on that date (or “now” if none)
+//   focusedDay    = widget.initialDate ?? nowInTunisia;
+
+//   // 2) Generate your half-hour slots array
+//   _generateTimeSlots();
+
+//   // 3) Initialize prefs + user points
+//   _initializePreferences();
+
+//   // 4) If we already have a selectedDate (i.e. they passed one in),
+//   //    immediately load its existing reservations
+//   if (selectedDate != null) {
+//     _fetchReservationsForDate(selectedDate!);
+//   }
+
+//   // 5) Restore your status-bar style
+//   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+//     statusBarColor: Colors.transparent,
+//     statusBarIconBrightness: Brightness.dark,
+//   ));
+
+//   // 6) (optional) debug
+//   print('OfficeRoomReservationScreen: received ${widget.reservations.length} reservations');
+// }
+
+// @override
+// void initState() {
+//   super.initState();
+
+//   // 1) Seed from the caller if they passed an initial date/time
+//   selectedDate  = widget.initialDate;
+//   checkInTime   = widget.initialCheckIn;
+//   checkOutTime  = widget.initialCheckOut;
+//   focusedDay    = widget.initialDate ?? nowInTunisia;
+
+//   // 2) Generate your half-hour slots array
+//   _generateTimeSlots();
+
+//   // 3) Initialize prefs + fetch user points
+//   _initializePreferences();
+
+//   // 4) If we already have a selectedDate, immediately load its existing reservations
+//   if (selectedDate != null) {
+//     _fetchReservationsForDate(selectedDate!);
+//   }
+
+//   // 5) (Optional) restore your status-bar style
+//   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+//     statusBarColor: Colors.transparent,
+//     statusBarIconBrightness: Brightness.dark,
+//   ));
+// }
+
+@override
+void initState() {
+  super.initState();
+
+  // 1) Seed from the caller if they passed an initial date/time
+  selectedDate  = widget.initialDate;
+  checkInTime   = widget.initialCheckIn;
+  checkOutTime  = widget.initialCheckOut;
+  focusedDay    = widget.initialDate ?? nowInTunisia;
+
+  // 2) Generate your half-hour slots array
+  _generateTimeSlots();
+
+  // 3) Initialize prefs + fetch user points
+  _initializePreferences();
+
+  // 4) If we already have a selectedDate, immediately load its reservations
+  if (selectedDate != null) {
+    _fetchReservationsForDate(selectedDate!);
   }
+
+  // 5) Immediately calculate price if both times are set
+  if (checkInTime != null && checkOutTime != null) {
+    _calculatePrice();
+  }
+
+  // 6) (Optional) restore your status-bar style
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+  ));
+}
+
 
   @override
   void dispose() {
@@ -105,47 +219,109 @@ class _OfficeRoomReservationScreenState
     return '$h:$m';
   }
 
-  Future<void> _fetchReservationsForDate(DateTime date) async {
-    setState(() {
-      isLoading = true;
-      reservations = [];
-      checkInTime = null;
-      checkOutTime = null;
-      totalPrice = 0;
-    });
+//   Future<void> _fetchReservationsForDate(DateTime date) async {
+//     // setState(() {
+//     //   isLoading = true;
+//     //   reservations = [];
+//     //   checkInTime = null;
+//     //   checkOutTime = null;
+//     //   totalPrice = 0;
+//     // });
 
-    try {
-      final resp = await http.get(
-        Uri.parse('http://localhost:8000/ELACO/booking/getReservation'),
-        headers: {'Content-Type': 'application/json'},
-      );
+//     setState(() {
+//   isLoading = true;
+//   reservations = [];
+//   checkInTime  = null;    // ← blows away your initialCheckIn
+//   checkOutTime = null;    // ← blows away your initialCheckOut
+//   totalPrice   = 0;
+// });
 
-      if (resp.statusCode == 200) {
-        final decoded = json.decode(resp.body);
-        List<Map<String, dynamic>> allReservations = [];
+//     try {
+//       final resp = await http.get(
+//         Uri.parse('http://localhost:8000/ELACO/booking/getReservation'),
+//         headers: {'Content-Type': 'application/json'},
+//       );
 
-        if (decoded['data'] is List && decoded['data'].isNotEmpty) {
-          if (decoded['data'][0] is List) {
-            allReservations =
-                List<Map<String, dynamic>>.from(decoded['data'][0]);
-          } else {
-            allReservations = List<Map<String, dynamic>>.from(decoded['data']);
-          }
+//       if (resp.statusCode == 200) {
+//         final decoded = json.decode(resp.body);
+//         List<Map<String, dynamic>> allReservations = [];
+
+//         if (decoded['data'] is List && decoded['data'].isNotEmpty) {
+//           if (decoded['data'][0] is List) {
+//             allReservations =
+//                 List<Map<String, dynamic>>.from(decoded['data'][0]);
+//           } else {
+//             allReservations = List<Map<String, dynamic>>.from(decoded['data']);
+//           }
+//         }
+
+//         setState(() {
+//           reservations = allReservations.where((res) {
+//             final resDateStr = res['date'].toString().split('T')[0];
+//             final resDate = DateTime.parse(resDateStr);
+//             return resDate == DateTime(date.year, date.month, date.day);
+//           }).toList();
+//         });
+//       }
+//     } catch (e) {
+//       _showErrorSnackBar('Failed to load reservations');
+//     }
+//     setState(() => isLoading = false);
+//   }
+
+Future<void> _fetchReservationsForDate(DateTime date) async {
+  // 1) show loader and clear only your reservations + price
+  setState(() {
+    isLoading = true;
+    reservations = [];
+    totalPrice = 0;
+  });
+
+  try {
+    // 2) fetch from your backend
+    final resp = await http.get(
+      Uri.parse('http://localhost:8000/ELACO/booking/getReservation'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (resp.statusCode == 200) {
+      final decoded = json.decode(resp.body);
+      List<Map<String, dynamic>> allReservations = [];
+
+      // 3) normalize whether data comes wrapped in an extra list
+      if (decoded['data'] is List && decoded['data'].isNotEmpty) {
+        if (decoded['data'][0] is List) {
+          allReservations =
+              List<Map<String, dynamic>>.from(decoded['data'][0]);
+        } else {
+          allReservations =
+              List<Map<String, dynamic>>.from(decoded['data']);
         }
-
-        setState(() {
-          reservations = allReservations.where((res) {
-            final resDateStr = res['date'].toString().split('T')[0];
-            final resDate = DateTime.parse(resDateStr);
-            return resDate == DateTime(date.year, date.month, date.day);
-          }).toList();
-        });
       }
-    } catch (e) {
-      _showErrorSnackBar('Failed to load reservations');
+
+      // 4) filter for exactly the tapped date
+      final filtered = allReservations.where((res) {
+        final resDateStr = res['date'].toString().split('T')[0];
+        final resDate = DateTime.parse(resDateStr);
+        return resDate ==
+            DateTime(date.year, date.month, date.day);
+      }).toList();
+
+      // 5) update your reservations list
+      setState(() {
+        reservations = filtered;
+      });
     }
+  } catch (e) {
+    // 6) show error if fetch fails
+    _showErrorSnackBar('Failed to load reservations');
+  } finally {
+    // 7) hide loader
     setState(() => isLoading = false);
   }
+}
+
+
 
   bool _isRangeAvailable(int start, int end) {
     for (final reservation in reservations) {
@@ -504,74 +680,247 @@ class _OfficeRoomReservationScreenState
     );
   }
 
-  Widget _buildCalendarCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+  // Widget _buildCalendarCard() {
+  //   return Container(
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(12),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.05),
+  //           blurRadius: 10,
+  //           offset: const Offset(0, 5),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       children: [
+  //         TableCalendar(
+  //           firstDay: nowInTunisia,
+  //           lastDay: nowInTunisia.add(const Duration(days: 365)),
+  //           focusedDay: focusedDay,
+  //           selectedDayPredicate: (day) => isSameDay(day, selectedDate),
+  //           onDaySelected: (day, focus) async {
+  //             setState(() {
+  //               focusedDay = focus;
+  //               selectedDate = day;
+  //             });
+  //             await _fetchReservationsForDate(day);
+  //           },
+  //           calendarStyle: CalendarStyle(
+  //             selectedDecoration: BoxDecoration(
+  //               color: _colorScheme[2],
+  //               shape: BoxShape.circle,
+  //             ),
+  //             todayDecoration: BoxDecoration(
+  //               color: _colorScheme[2].withOpacity(0.3),
+  //               shape: BoxShape.circle,
+  //             ),
+  //             outsideDaysVisible: false,
+  //           ),
+  //           headerStyle: HeaderStyle(
+  //             formatButtonVisible: false,
+  //             titleCentered: true,
+  //             titleTextStyle: TextStyle(
+  //               fontSize: 16,
+  //               fontWeight: FontWeight.bold,
+  //               color: _colorScheme[2],
+  //             ),
+  //             leftChevronIcon: Icon(Icons.chevron_left, color: _colorScheme[2]),
+  //             rightChevronIcon:
+  //                 Icon(Icons.chevron_right, color: _colorScheme[2]),
+  //           ),
+  //         ),
+  //         if (selectedDate != null)
+  //           Container(
+  //             padding: const EdgeInsets.symmetric(vertical: 12),
+  //             alignment: Alignment.center,
+  //             child: Text(
+  //               'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(selectedDate!)}',
+  //               style: TextStyle(
+  //                 fontWeight: FontWeight.w500,
+  //                 color: _colorScheme[2],
+  //               ),
+  //             ),
+  //           ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+//   Widget _buildCalendarCard() {
+//   return Container(
+//     padding: const EdgeInsets.all(16),
+//     decoration: BoxDecoration(
+//       color: Colors.white,
+//       borderRadius: BorderRadius.circular(12),
+//       boxShadow: [
+//         BoxShadow(
+//           color: Colors.black.withOpacity(0.05),
+//           blurRadius: 10,
+//           offset: const Offset(0, 5),
+//         ),
+//       ],
+//     ),
+//     child: Column(
+//       children: [
+//         TableCalendar(
+//           // 1) bounds
+//           firstDay: nowInTunisia,
+//           lastDay: nowInTunisia.add(const Duration(days: 365)),
+//           focusedDay: focusedDay,
+
+//           // 2) keep track of calendar vs. your DateTime state
+//           calendarFormat: _calendarFmt,
+//           onFormatChanged: (fmt) => setState(() => _calendarFmt = fmt),
+
+//           // 3) highlight the currently selected day
+//           selectedDayPredicate: (day) => isSameDay(day, selectedDate),
+
+//           // 4) when the user taps a new day:
+//           onDaySelected: (day, focus) {
+//             setState(() {
+//               // a) switch the “focused” month/day
+//               selectedDate = day;
+//               focusedDay   = focus;
+
+//               // b) clear any prior time‐selections
+//               checkInTime  = null;
+//               checkOutTime = null;
+//               totalPrice   = 0;
+//             });
+
+//             // c) reload your reservations for that date
+//             _fetchReservationsForDate(day);
+//           },
+
+//           // 5) styling
+//           calendarStyle: CalendarStyle(
+//             selectedDecoration: BoxDecoration(
+//               color: _colorScheme[2],
+//               shape: BoxShape.circle,
+//             ),
+//             todayDecoration: BoxDecoration(
+//               color: _colorScheme[2].withOpacity(0.3),
+//               shape: BoxShape.circle,
+//             ),
+//             outsideDaysVisible: false,
+//           ),
+//           headerStyle: HeaderStyle(
+//             formatButtonVisible: false,
+//             titleCentered: true,
+//             titleTextStyle: TextStyle(
+//               fontSize: 16,
+//               fontWeight: FontWeight.bold,
+//               color: _colorScheme[2],
+//             ),
+//             leftChevronIcon:
+//                 Icon(Icons.chevron_left, color: _colorScheme[2]),
+//             rightChevronIcon:
+//                 Icon(Icons.chevron_right, color: _colorScheme[2]),
+//           ),
+//         ),
+
+//         // show “Selected: …” below the calendar
+//         if (selectedDate != null)
+//           Padding(
+//             padding: const EdgeInsets.only(top: 12),
+//             child: Text(
+//               'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(selectedDate!)}',
+//               style: TextStyle(
+//                 fontWeight: FontWeight.w500,
+//                 color: _colorScheme[2],
+//               ),
+//             ),
+//           ),
+//       ],
+//     ),
+//   );
+// }
+
+Widget _buildCalendarCard() {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        TableCalendar(
+          firstDay: nowInTunisia,
+          lastDay: nowInTunisia.add(const Duration(days: 365)),
+          focusedDay: focusedDay,
+
+          // ← use the newly declared _calendarFmt
+          calendarFormat: _calendarFmt,
+          onFormatChanged: (fmt) => setState(() => _calendarFmt = fmt),
+
+          selectedDayPredicate: (day) =>
+            selectedDate != null && isSameDay(day, selectedDate!),
+
+          onDaySelected: (day, focus) {
+            setState(() {
+              selectedDate = day;
+              focusedDay   = focus;
+              checkInTime  = null;
+              checkOutTime = null;
+              totalPrice   = 0;
+            });
+            _fetchReservationsForDate(day);
+          },
+
+          calendarStyle: CalendarStyle(
+            selectedDecoration: BoxDecoration(
+              color: _colorScheme[2],
+              shape: BoxShape.circle,
+            ),
+            todayDecoration: BoxDecoration(
+              color: _colorScheme[2].withOpacity(0.3),
+              shape: BoxShape.circle,
+            ),
+            outsideDaysVisible: false,
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          TableCalendar(
-            firstDay: nowInTunisia,
-            lastDay: nowInTunisia.add(const Duration(days: 365)),
-            focusedDay: focusedDay,
-            selectedDayPredicate: (day) => isSameDay(day, selectedDate),
-            onDaySelected: (day, focus) async {
-              setState(() {
-                focusedDay = focus;
-                selectedDate = day;
-              });
-              await _fetchReservationsForDate(day);
-            },
-            calendarStyle: CalendarStyle(
-              selectedDecoration: BoxDecoration(
-                color: _colorScheme[2],
-                shape: BoxShape.circle,
-              ),
-              todayDecoration: BoxDecoration(
-                color: _colorScheme[2].withOpacity(0.3),
-                shape: BoxShape.circle,
-              ),
-              outsideDaysVisible: false,
+          headerStyle: HeaderStyle(
+            formatButtonVisible: false,
+            titleCentered: true,
+            titleTextStyle: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: _colorScheme[2],
             ),
-            headerStyle: HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-              titleTextStyle: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            leftChevronIcon:
+                Icon(Icons.chevron_left, color: _colorScheme[2]),
+            rightChevronIcon:
+                Icon(Icons.chevron_right, color: _colorScheme[2]),
+          ),
+        ),
+
+        if (selectedDate != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(selectedDate!)}',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
                 color: _colorScheme[2],
               ),
-              leftChevronIcon: Icon(Icons.chevron_left, color: _colorScheme[2]),
-              rightChevronIcon:
-                  Icon(Icons.chevron_right, color: _colorScheme[2]),
             ),
           ),
-          if (selectedDate != null)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              alignment: Alignment.center,
-              child: Text(
-                'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(selectedDate!)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: _colorScheme[2],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
+
+
 
   Widget _buildTimeSelectionCard() {
     return Container(

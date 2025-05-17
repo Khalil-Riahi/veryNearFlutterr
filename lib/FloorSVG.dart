@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/OfficeRoom_details_screen.dart';
+import 'package:flutter_application_1/OpenSpace_details_screen%20copy.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path_drawing/path_drawing.dart';
 import 'package:svg_path_parser/svg_path_parser.dart';
@@ -10,7 +12,42 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+class _TableHighlightPainter extends CustomPainter {
+  static const _svgW = 1665.0, _svgH = 1997.0;
 
+  final Map<int, Path> tablePaths;
+  final bool Function(int) isReserved;
+
+  _TableHighlightPainter(this.tablePaths, this.isReserved);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. compute same fit-and-center transform you use for hits
+    final scale = math.min(size.width / _svgW, size.height / _svgH);
+    final dx = (size.width - _svgW * scale) / 2;
+    final dy = (size.height - _svgH * scale) / 2;
+    canvas
+      ..save()
+      ..translate(dx, dy)
+      ..scale(scale, scale);
+
+    // 2. draw each reserved table in semi-transparent red
+    final paint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.red.withOpacity(0.4);
+    for (final entry in tablePaths.entries) {
+      if (isReserved(entry.key)) {
+        canvas.drawPath(entry.value, paint);
+      }
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _TableHighlightPainter old) =>
+      old.tablePaths != tablePaths || old.isReserved != isReserved;
+}
 
 class FloorPlanBookingPage extends StatefulWidget {
   const FloorPlanBookingPage({super.key});
@@ -21,9 +58,13 @@ class FloorPlanBookingPage extends StatefulWidget {
 class _FloorPlanBookingPageState extends State<FloorPlanBookingPage> {
   static const _svgWidth = 1665.0;
   static const _svgHeight = 1997.0;
+  Map<String, dynamic>? _selectedTableInfo;
+List<Map<String, dynamic>> _selectedTableReservations = [];
+
   final _controller = TransformationController();
   final Map<int, Path> _tablePaths = {};
   List<Map<String, dynamic>> _reservations = [];
+  List<Map<String, dynamic>> _tables = [];
 
   DateTime _selectedDay = DateTime.now().toUtc().add(const Duration(hours: 1));
   DateTime _focusedDay = DateTime.now().toUtc().add(const Duration(hours: 1));
@@ -345,12 +386,132 @@ class _FloorPlanBookingPageState extends State<FloorPlanBookingPage> {
 <path d="M858.17 1749V1722.82H867.017C869.071 1722.82 870.75 1723.19 872.054 1723.93C873.366 1724.66 874.338 1725.66 874.969 1726.91C875.599 1728.16 875.915 1729.56 875.915 1731.1C875.915 1732.64 875.599 1734.05 874.969 1735.31C874.347 1736.57 873.384 1737.58 872.08 1738.33C870.776 1739.07 869.105 1739.44 867.068 1739.44H860.727V1736.62H866.966C868.372 1736.62 869.501 1736.38 870.354 1735.9C871.206 1735.41 871.824 1734.75 872.207 1733.93C872.599 1733.09 872.795 1732.15 872.795 1731.1C872.795 1730.05 872.599 1729.12 872.207 1728.29C871.824 1727.46 871.202 1726.82 870.341 1726.35C869.48 1725.87 868.338 1725.63 866.915 1725.63H861.341V1749H858.17ZM880.613 1749V1729.36H883.528V1732.33H883.732C884.09 1731.36 884.738 1730.57 885.675 1729.96C886.613 1729.36 887.67 1729.06 888.846 1729.06C889.067 1729.06 889.344 1729.06 889.677 1729.07C890.009 1729.08 890.261 1729.09 890.431 1729.11V1732.18C890.329 1732.15 890.094 1732.11 889.728 1732.06C889.37 1732 888.991 1731.97 888.59 1731.97C887.636 1731.97 886.783 1732.17 886.033 1732.57C885.292 1732.96 884.704 1733.51 884.269 1734.21C883.843 1734.9 883.63 1735.69 883.63 1736.57V1749H880.613ZM894.007 1749V1729.36H897.025V1749H894.007ZM895.542 1726.09C894.953 1726.09 894.446 1725.89 894.02 1725.49C893.603 1725.09 893.394 1724.61 893.394 1724.05C893.394 1723.48 893.603 1723 894.02 1722.6C894.446 1722.2 894.953 1722 895.542 1722C896.13 1722 896.632 1722.2 897.05 1722.6C897.476 1723 897.689 1723.48 897.689 1724.05C897.689 1724.61 897.476 1725.09 897.05 1725.49C896.632 1725.89 896.13 1726.09 895.542 1726.09ZM918.607 1729.36L911.346 1749H908.278L901.016 1729.36H904.289L909.71 1745.01H909.914L915.335 1729.36H918.607ZM927.77 1749.46C926.526 1749.46 925.397 1749.23 924.382 1748.76C923.368 1748.28 922.563 1747.59 921.966 1746.7C921.37 1745.8 921.071 1744.7 921.071 1743.43C921.071 1742.3 921.293 1741.39 921.736 1740.69C922.179 1739.98 922.772 1739.43 923.513 1739.03C924.255 1738.63 925.073 1738.33 925.968 1738.13C926.871 1737.93 927.779 1737.77 928.691 1737.65C929.884 1737.49 930.851 1737.38 931.593 1737.3C932.343 1737.22 932.888 1737.08 933.229 1736.88C933.578 1736.68 933.753 1736.34 933.753 1735.86V1735.76C933.753 1734.49 933.408 1733.51 932.718 1732.82C932.036 1732.12 931 1731.77 929.611 1731.77C928.171 1731.77 927.042 1732.08 926.223 1732.71C925.405 1733.34 924.83 1734.02 924.498 1734.73L921.634 1733.71C922.145 1732.52 922.827 1731.59 923.679 1730.92C924.54 1730.25 925.478 1729.78 926.492 1729.52C927.515 1729.24 928.52 1729.11 929.509 1729.11C930.14 1729.11 930.864 1729.18 931.682 1729.34C932.509 1729.48 933.306 1729.79 934.073 1730.25C934.848 1730.71 935.492 1731.4 936.003 1732.33C936.515 1733.26 936.77 1734.5 936.77 1736.06V1749H933.753V1746.34H933.6C933.395 1746.77 933.054 1747.22 932.577 1747.71C932.1 1748.19 931.465 1748.61 930.672 1748.95C929.88 1749.29 928.912 1749.46 927.77 1749.46ZM928.23 1746.75C929.424 1746.75 930.429 1746.52 931.248 1746.05C932.074 1745.58 932.696 1744.97 933.114 1744.23C933.54 1743.49 933.753 1742.71 933.753 1741.89V1739.13C933.625 1739.28 933.344 1739.42 932.909 1739.55C932.483 1739.67 931.989 1739.78 931.426 1739.87C930.873 1739.96 930.331 1740.03 929.803 1740.1C929.283 1740.16 928.861 1740.21 928.537 1740.26C927.753 1740.36 927.02 1740.52 926.338 1740.75C925.665 1740.98 925.12 1741.31 924.702 1741.76C924.293 1742.21 924.088 1742.81 924.088 1743.58C924.088 1744.63 924.476 1745.42 925.252 1745.96C926.036 1746.49 927.029 1746.75 928.23 1746.75ZM950.817 1729.36V1731.92H940.641V1729.36H950.817ZM943.607 1724.66H946.624V1743.38C946.624 1744.23 946.747 1744.87 946.994 1745.29C947.25 1745.71 947.574 1745.99 947.966 1746.14C948.366 1746.27 948.788 1746.34 949.232 1746.34C949.564 1746.34 949.837 1746.32 950.05 1746.29C950.263 1746.25 950.433 1746.21 950.561 1746.19L951.175 1748.9C950.97 1748.97 950.685 1749.05 950.318 1749.13C949.952 1749.21 949.487 1749.26 948.925 1749.26C948.072 1749.26 947.237 1749.07 946.419 1748.71C945.609 1748.34 944.936 1747.78 944.399 1747.03C943.871 1746.28 943.607 1745.34 943.607 1744.19V1724.66ZM963.377 1749.41C961.485 1749.41 959.853 1748.99 958.481 1748.16C957.117 1747.31 956.065 1746.14 955.323 1744.63C954.59 1743.11 954.224 1741.35 954.224 1739.34C954.224 1737.32 954.59 1735.55 955.323 1734.02C956.065 1732.47 957.096 1731.27 958.417 1730.41C959.746 1729.54 961.298 1729.11 963.07 1729.11C964.093 1729.11 965.103 1729.28 966.1 1729.62C967.097 1729.96 968.005 1730.51 968.823 1731.28C969.641 1732.04 970.293 1733.05 970.779 1734.3C971.265 1735.55 971.508 1737.09 971.508 1738.93V1740.2H956.371V1737.6H968.44C968.44 1736.49 968.218 1735.5 967.775 1734.63C967.34 1733.76 966.718 1733.08 965.908 1732.57C965.107 1732.07 964.161 1731.82 963.07 1731.82C961.869 1731.82 960.829 1732.12 959.951 1732.71C959.082 1733.3 958.413 1734.07 957.944 1735.01C957.475 1735.96 957.241 1736.97 957.241 1738.06V1739.8C957.241 1741.28 957.496 1742.54 958.008 1743.57C958.528 1744.59 959.248 1745.37 960.168 1745.91C961.089 1746.43 962.158 1746.7 963.377 1746.7C964.17 1746.7 964.886 1746.59 965.525 1746.37C966.173 1746.14 966.731 1745.8 967.2 1745.34C967.668 1744.88 968.031 1744.31 968.286 1743.63L971.201 1744.45C970.894 1745.44 970.379 1746.31 969.654 1747.06C968.93 1747.8 968.035 1748.38 966.969 1748.8C965.904 1749.2 964.707 1749.41 963.377 1749.41ZM1008.72 1735.91C1008.72 1738.67 1008.22 1741.06 1007.23 1743.07C1006.23 1745.08 1004.86 1746.63 1003.12 1747.72C1001.38 1748.81 999.398 1749.36 997.165 1749.36C994.933 1749.36 992.947 1748.81 991.208 1747.72C989.469 1746.63 988.102 1745.08 987.104 1743.07C986.107 1741.06 985.609 1738.67 985.609 1735.91C985.609 1733.15 986.107 1730.76 987.104 1728.75C988.102 1726.74 989.469 1725.19 991.208 1724.1C992.947 1723.01 994.933 1722.46 997.165 1722.46C999.398 1722.46 1001.38 1723.01 1003.12 1724.1C1004.86 1725.19 1006.23 1726.74 1007.23 1728.75C1008.22 1730.76 1008.72 1733.15 1008.72 1735.91ZM1005.65 1735.91C1005.65 1733.64 1005.27 1731.73 1004.52 1730.17C1003.77 1728.61 1002.75 1727.43 1001.46 1726.63C1000.18 1725.83 998.751 1725.43 997.165 1725.43C995.58 1725.43 994.144 1725.83 992.857 1726.63C991.579 1727.43 990.56 1728.61 989.802 1730.17C989.052 1731.73 988.677 1733.64 988.677 1735.91C988.677 1738.18 989.052 1740.09 989.802 1741.65C990.56 1743.21 991.579 1744.39 992.857 1745.19C994.144 1745.99 995.58 1746.39 997.165 1746.39C998.751 1746.39 1000.18 1745.99 1001.46 1745.19C1002.75 1744.39 1003.77 1743.21 1004.52 1741.65C1005.27 1740.09 1005.65 1738.18 1005.65 1735.91ZM1022.39 1729.36V1731.92H1011.8V1729.36H1022.39ZM1014.97 1749V1726.65C1014.97 1725.53 1015.24 1724.59 1015.77 1723.84C1016.29 1723.09 1016.98 1722.53 1017.82 1722.15C1018.67 1721.78 1019.56 1721.59 1020.5 1721.59C1021.24 1721.59 1021.84 1721.65 1022.31 1721.77C1022.78 1721.89 1023.13 1722 1023.36 1722.1L1022.49 1724.71C1022.34 1724.66 1022.12 1724.6 1021.85 1724.52C1021.59 1724.44 1021.24 1724.4 1020.8 1724.4C1019.81 1724.4 1019.09 1724.65 1018.64 1725.16C1018.21 1725.66 1017.99 1726.4 1017.99 1727.37V1749H1014.97ZM1035.36 1729.36V1731.92H1024.78V1729.36H1035.36ZM1027.95 1749V1726.65C1027.95 1725.53 1028.21 1724.59 1028.74 1723.84C1029.27 1723.09 1029.95 1722.53 1030.8 1722.15C1031.64 1721.78 1032.53 1721.59 1033.47 1721.59C1034.21 1721.59 1034.82 1721.65 1035.28 1721.77C1035.75 1721.89 1036.1 1722 1036.33 1722.1L1035.46 1724.71C1035.31 1724.66 1035.1 1724.6 1034.82 1724.52C1034.56 1724.44 1034.21 1724.4 1033.78 1724.4C1032.78 1724.4 1032.06 1724.65 1031.62 1725.16C1031.18 1725.66 1030.96 1726.4 1030.96 1727.37V1749H1027.95ZM1039.59 1749V1729.36H1042.61V1749H1039.59ZM1041.12 1726.09C1040.54 1726.09 1040.03 1725.89 1039.6 1725.49C1039.18 1725.09 1038.98 1724.61 1038.98 1724.05C1038.98 1723.48 1039.18 1723 1039.6 1722.6C1040.03 1722.2 1040.54 1722 1041.12 1722C1041.71 1722 1042.21 1722.2 1042.63 1722.6C1043.06 1723 1043.27 1723.48 1043.27 1724.05C1043.27 1724.61 1043.06 1725.09 1042.63 1725.49C1042.21 1725.89 1041.71 1726.09 1041.12 1726.09ZM1056.11 1749.41C1054.27 1749.41 1052.68 1748.97 1051.35 1748.11C1050.02 1747.24 1049 1746.04 1048.29 1744.51C1047.57 1742.99 1047.21 1741.24 1047.21 1739.28C1047.21 1737.29 1047.58 1735.53 1048.31 1734C1049.05 1732.47 1050.08 1731.27 1051.41 1730.41C1052.73 1729.54 1054.29 1729.11 1056.06 1729.11C1057.44 1729.11 1058.68 1729.36 1059.79 1729.88C1060.9 1730.39 1061.81 1731.1 1062.51 1732.02C1063.22 1732.94 1063.66 1734.02 1063.83 1735.24H1060.81C1060.58 1734.35 1060.07 1733.56 1059.28 1732.87C1058.5 1732.17 1057.44 1731.82 1056.11 1731.82C1054.93 1731.82 1053.9 1732.12 1053.02 1732.74C1052.14 1733.34 1051.45 1734.2 1050.96 1735.31C1050.47 1736.41 1050.23 1737.7 1050.23 1739.18C1050.23 1740.7 1050.47 1742.02 1050.94 1743.14C1051.43 1744.27 1052.11 1745.14 1052.99 1745.77C1053.88 1746.39 1054.92 1746.7 1056.11 1746.7C1056.89 1746.7 1057.61 1746.56 1058.24 1746.29C1058.88 1746.02 1059.43 1745.62 1059.87 1745.11C1060.31 1744.6 1060.63 1743.99 1060.81 1743.27H1063.83C1063.66 1744.43 1063.24 1745.48 1062.57 1746.4C1061.9 1747.33 1061.02 1748.06 1059.92 1748.6C1058.83 1749.14 1057.56 1749.41 1056.11 1749.41ZM1076.47 1749.41C1074.58 1749.41 1072.95 1748.99 1071.58 1748.16C1070.21 1747.31 1069.16 1746.14 1068.42 1744.63C1067.69 1743.11 1067.32 1741.35 1067.32 1739.34C1067.32 1737.32 1067.69 1735.55 1068.42 1734.02C1069.16 1732.47 1070.19 1731.27 1071.51 1730.41C1072.84 1729.54 1074.4 1729.11 1076.17 1729.11C1077.19 1729.11 1078.2 1729.28 1079.2 1729.62C1080.19 1729.96 1081.1 1730.51 1081.92 1731.28C1082.74 1732.04 1083.39 1733.05 1083.88 1734.3C1084.36 1735.55 1084.61 1737.09 1084.61 1738.93V1740.2H1069.47V1737.6H1081.54C1081.54 1736.49 1081.32 1735.5 1080.87 1734.63C1080.44 1733.76 1079.82 1733.08 1079.01 1732.57C1078.2 1732.07 1077.26 1731.82 1076.17 1731.82C1074.97 1731.82 1073.93 1732.12 1073.05 1732.71C1072.18 1733.3 1071.51 1734.07 1071.04 1735.01C1070.57 1735.96 1070.34 1736.97 1070.34 1738.06V1739.8C1070.34 1741.28 1070.59 1742.54 1071.11 1743.57C1071.63 1744.59 1072.35 1745.37 1073.27 1745.91C1074.19 1746.43 1075.26 1746.7 1076.47 1746.7C1077.27 1746.7 1077.98 1746.59 1078.62 1746.37C1079.27 1746.14 1079.83 1745.8 1080.3 1745.34C1080.77 1744.88 1081.13 1744.31 1081.38 1743.63L1084.3 1744.45C1083.99 1745.44 1083.48 1746.31 1082.75 1747.06C1082.03 1747.8 1081.13 1748.38 1080.07 1748.8C1079 1749.2 1077.8 1749.41 1076.47 1749.41Z" fill="black"/>
 </svg>''';
 
-  @override
-  void initState() {
-    super.initState();
-    _parseSvgToPaths();
-    _fetchReservations();
-  }
+  // TimeOfDay _roundUpToNextSlot(DateTime dt) {
+  //   final totalMins = dt.hour * 60 + dt.minute;
+  //   final slot = (dt.minute % 30 == 0)
+  //     ? totalMins
+  //     : ((totalMins ~/ 30) + 1) * 30;
+  //   final h = (slot ~/ 60) % 24;
+  //   final m = slot % 60;
+  //   return TimeOfDay(hour: h, minute: m);
+  // }
+
+  TimeOfDay _roundUpToNextSlot(DateTime dt) {
+  final totalMins = dt.hour * 60 + dt.minute;
+  final slot = (dt.minute % 30 == 0)
+    ? totalMins
+    : ((totalMins ~/ 30) + 1) * 30;
+  final h = (slot ~/ 60) % 24;
+  final m = slot % 60;
+  return TimeOfDay(hour: h, minute: m);
+}
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _parseSvgToPaths();
+  //   _fetchReservations();
+  //   _fetchTables();
+  // }
+
+  //   @override
+  // void initState() {
+  //   super.initState();
+
+  //   // 1) compute “now” in Tunisia timezone
+  //   final now = DateTime.now().toUtc().add(const Duration(hours: 1));
+
+  //   // 2) round up to next half-hour
+  //   _start = _roundUpToNextSlot(now);
+
+  //   // 3) make default end one hour later (or +30m if you prefer)
+  //   final endMins = _start.hour * 60 + _start.minute + 60;
+  //   _end = TimeOfDay(hour: (endMins ~/ 60) % 24, minute: endMins % 60);
+
+  //   // 4) seed your calendar too
+  //   _selectedDay = now;
+  //   _focusedDay  = now;
+
+  //   // … then your existing setup calls:
+  //   _parseSvgToPaths();
+  //   _fetchReservations();
+  //   _fetchTables();
+  // }
+
+//   @override
+// void initState() {
+//   super.initState();
+
+//   // 1) “Now” in Tunisia
+//   final now = DateTime.now().toUtc().add(const Duration(hours: 1));
+
+//   // 2) If it’s 23:00 or later, default to tomorrow’s date; otherwise today
+//   final todayMidnight = DateTime(now.year, now.month, now.day);
+//   final defaultDate = (now.hour >= 23)
+//       ? todayMidnight.add(const Duration(days: 1))
+//       : todayMidnight;
+
+//   // 3) Round up to the next half-hour for your start time
+//   _start = _roundUpToNextSlot(now);
+
+//   // 4) Default end time one hour later
+//   final endMins = _start.hour * 60 + _start.minute + 60;
+//   _end = TimeOfDay(
+//     hour: (endMins ~/ 60) % 24,
+//     minute: endMins % 60,
+//   );
+
+//   // 5) Seed your calendar with the chosen date
+//   _selectedDay  = defaultDate;
+//   _focusedDay   = defaultDate;
+//   _calendarFmt  = CalendarFormat.month;
+
+//   // 6) Now parse your SVG and load data
+//   _parseSvgToPaths();
+//   _fetchReservations();
+//   _fetchTables();
+// }
+
+@override
+void initState() {
+  super.initState();
+
+  // 1) “Now” in Tunisia
+  final nowTunisia = DateTime.now().toUtc().add(const Duration(hours: 1));
+
+  // 2) Compute today at midnight, and tomorrow
+  final today    = DateTime(nowTunisia.year, nowTunisia.month, nowTunisia.day);
+  final tomorrow = today.add(const Duration(days: 1));
+
+  // 3) If it’s 23:00 or later, default to tomorrow; otherwise today
+  _selectedDay = nowTunisia.hour >= 23 ? tomorrow : today;
+  _focusedDay  = _selectedDay;
+
+  // 4) Calendar stays in month view
+  _calendarFmt = CalendarFormat.month;
+
+  // 5) Decide start time:
+  //    • if we’re still “today”, round up to the next half-hour
+  //    • if we’re on tomorrow, always start at 08:00  
+  final isToday = isSameDay(_selectedDay, today);
+  _start = isToday
+    ? _roundUpToNextSlot(nowTunisia)
+    : const TimeOfDay(hour: 8, minute: 0);
+
+  // 6) Default end time = start + 1 hour
+  final endMinutes = _start.hour * 60 + _start.minute + 60;
+  _end = TimeOfDay(
+    hour:   (endMinutes ~/ 60) % 24,
+    minute: endMinutes % 60,
+  );
+
+  // 7) Now parse your floor-plan SVG & load data
+  _parseSvgToPaths();
+  _fetchReservations();
+  _fetchTables();
+}
+
+
 
   @override
   void dispose() {
@@ -423,22 +584,130 @@ class _FloorPlanBookingPageState extends State<FloorPlanBookingPage> {
     }
   }
 
-  bool _tableInConflict(int id) {
-    final selDate = DateFormat('yyyy-MM-dd').format(_selectedDay);
-    return _reservations.any((r) {
-      if (r['numTable'] != id) return false;
-      if (!r['date'].toString().startsWith(selDate)) return false;
-      final inT = TimeOfDay(
-        hour: int.parse(r['check_in'].split(':')[0]),
-        minute: int.parse(r['check_in'].split(':')[1]),
-      );
-      final outT = TimeOfDay(
-        hour: int.parse(r['check_out'].split(':')[0]),
-        minute: int.parse(r['check_out'].split(':')[1]),
-      );
-      return inT.hour < _end.hour && _start.hour < outT.hour;
-    });
+  Future<void> _fetchTables() async {
+    try {
+      final uri = Uri.parse('http://localhost:8000/ELACO/table/getAllTables');
+      final resp = await http.get(uri);
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body);
+        if (body['status'] == 'success') {
+          setState(() => _tables =
+              (body['data']['tables'] as List).cast<Map<String, dynamic>>());
+        }
+        print("object");
+        print(_tables);
+      }
+    } catch (e) {
+      print('API error: $e');
+    }
   }
+
+  void _selectTable(int id) {
+  // 1) find the table record
+  final table = _tables.firstWhere(
+    (t) => t['numTable'] == id,
+    orElse: () => {},
+  );
+  if (table.isEmpty) return; // no table
+
+  // 2) filter today's reservations for that table
+  final selDate = DateFormat('yyyy-MM-dd').format(_selectedDay);
+  final todayRes = _reservations.where((r) {
+    return r['numTable'] == id &&
+      (r['date'] as String).startsWith(selDate);
+  }).toList();
+
+  setState(() {
+    _selectedTableInfo = table;
+    _selectedTableReservations = todayRes;
+  });
+
+  _showTableDetailsDialog();
+}
+
+void _showTableDetailsDialog() {
+  final table = _selectedTableInfo!;
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('Table ${table['numTable']} — ${table['Name']}'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Status: ${table['status']}'),
+            Text('Capacity: ${table['capacity']}'),
+            if ((table['description'] as List).isNotEmpty)
+              Text('Features: ${(table['description'] as List).join(', ')}'),
+            if ((table['prices'] as List).isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('Prices:'),
+              for (var p in table['prices'])
+                Text('  • ${p['duration']}: \$${p['price']}'),
+            ],
+            const SizedBox(height: 12),
+            Text('QR Code URL:'),
+            SelectableText(table['QrCode']),
+            if (_selectedTableReservations.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text('Today’s reservations:'),
+              for (var r in _selectedTableReservations)
+                Text('  • ${r['check_in']} → ${r['check_out']}'),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Close'),
+        ),
+        // you can also add e.g. a “Book” button here
+      ],
+    ),
+  );
+}
+
+
+  // bool _tableInConflict(int id) {
+  //   final selDate = DateFormat('yyyy-MM-dd').format(_selectedDay);
+  //   return _reservations.any((r) {
+  //     if (r['numTable'] != id) return false;
+  //     if (!r['date'].toString().startsWith(selDate)) return false;
+  //     final inT = TimeOfDay(
+  //       hour: int.parse(r['check_in'].split(':')[0]),
+  //       minute: int.parse(r['check_in'].split(':')[1]),
+  //     );
+  //     final outT = TimeOfDay(
+  //       hour: int.parse(r['check_out'].split(':')[0]),
+  //       minute: int.parse(r['check_out'].split(':')[1]),
+  //     );
+  //     return inT.hour < _end.hour && _start.hour < outT.hour;
+  //   });
+  // }
+
+  bool _tableInConflict(int id) {
+  final selDate = DateFormat('yyyy-MM-dd').format(_selectedDay);
+  final startMinutes = _start.hour * 60 + _start.minute;
+  final endMinutes   = _end.hour   * 60 + _end.minute;
+
+  return _reservations.any((r) {
+    // 1) same table
+    if (r['numTable'] != id) return false;
+    // 2) same date
+    if (!(r['date'] as String).startsWith(selDate)) return false;
+
+    // 3) parse reservation check‐in/out into minutes
+    final partsIn  = (r['check_in'] as String).split(':');
+    final partsOut = (r['check_out'] as String).split(':');
+    final resStart = int.parse(partsIn[0]) * 60 + int.parse(partsIn[1]);
+    final resEnd   = int.parse(partsOut[0]) * 60 + int.parse(partsOut[1]);
+
+    // 4) overlap if our start < their end AND their start < our end
+    return startMinutes < resEnd && resStart < endMinutes;
+  });
+}
+
 
   int? _hitTable(Offset pt) {
     int? chosen;
@@ -455,25 +724,243 @@ class _FloorPlanBookingPageState extends State<FloorPlanBookingPage> {
     return chosen;
   }
 
-  void _onTap(Offset pos, Size size) {
-    final inv = _controller.value.clone()..invert();
-    final viewPt = MatrixUtils.transformPoint(inv, pos);
-    final scale = math.min(size.width / _svgWidth, size.height / _svgHeight);
-    final dx = (size.width - _svgWidth * scale) / 2;
-    final dy = (size.height - _svgHeight * scale) / 2;
-    final svgPt = Offset((viewPt.dx - dx) / scale, (viewPt.dy - dy) / scale);
-    final id = _hitTable(svgPt);
-    if (id == null) return;
-    if (_tableInConflict(id)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('This table is already reserved!'),
-            backgroundColor: Colors.red),
-      );
-    } else {
-      _showDialog(id);
-    }
-  }
+
+
+// void _onTap(Offset pos, Size size) {
+//   // 1) Un-project the tap from screen coords into the SVG’s coordinate space
+//   final Matrix4 inv = _controller.value.clone()..invert();
+//   final Offset viewPt = MatrixUtils.transformPoint(inv, pos);
+  
+//   final double scale = math.min(size.width / _svgWidth, size.height / _svgHeight);
+//   final double dx = (size.width - _svgWidth * scale) / 2;
+//   final double dy = (size.height - _svgHeight * scale) / 2;
+  
+//   final Offset svgPt = Offset(
+//     (viewPt.dx - dx) / scale,
+//     (viewPt.dy - dy) / scale,
+//   );
+
+//   // 2) Hit-test to find which table was tapped
+//   final int? tableId = _hitTable(svgPt);
+//   if (tableId == null) return;
+
+//   // 3) Look up the table record (non-nullable)
+//   final Map<String, dynamic> tableInfo = _tables.firstWhere(
+//     (t) => t['numTable'] == tableId,
+//     orElse: () => <String, dynamic>{},
+//   );
+//   if (tableInfo.isEmpty) return;
+
+//   // 4) Gather that table’s reservations
+//   final List<Map<String, dynamic>> tableReservations = _reservations
+//       .where((r) => r['numTable'] == tableId)
+//       .toList();
+
+//   // 5) Push a full-screen dialog route with your reservation page
+//   Navigator.of(context).push(
+//     MaterialPageRoute(
+//       fullscreenDialog: true,
+//       builder: (ctx) => OpenSpaceReservationScreen(
+//         room: tableInfo,
+//         reservations: tableReservations,
+//       ),
+//     ),
+//   );
+// }
+
+// void _onTap(Offset pos, Size size) {
+//   // 1) Un-project the tap from screen coords into the SVG’s coordinate space
+//   final Matrix4 inv = _controller.value.clone()..invert();
+//   final Offset viewPt = MatrixUtils.transformPoint(inv, pos);
+
+//   // 2) Compute the same scale & translation used when drawing the SVG
+//   final double scale = math.min(size.width / _svgWidth, size.height / _svgHeight);
+//   final double dx    = (size.width  - _svgWidth  * scale) / 2;
+//   final double dy    = (size.height - _svgHeight * scale) / 2;
+
+//   // 3) Map to raw SVG coordinates
+//   final Offset svgPt = Offset(
+//     (viewPt.dx - dx) / scale,
+//     (viewPt.dy - dy) / scale,
+//   );
+
+//   // 4) Hit-test against your parsed table paths
+//   final int? tableId = _hitTable(svgPt);
+//   if (tableId == null) return;
+
+//   // 5) Look up the full table record (or bail if not found)
+//   final Map<String, dynamic> tableInfo = _tables.firstWhere(
+//     (t) => t['numTable'] == tableId,
+//     orElse: () => <String, dynamic>{},
+//   );
+//   if (tableInfo.isEmpty) return;
+
+//   // 6) Gather all reservations for that table
+//   final List<Map<String, dynamic>> tableReservations = _reservations
+//       .where((r) => r['numTable'] == tableId)
+//       .toList();
+
+//   // 7) Push a full-screen route, passing along the selected date & times
+//   Navigator.of(context).push(
+//     MaterialPageRoute(
+//       fullscreenDialog: true,
+//       builder: (_) => OpenSpaceReservationScreen(
+//         room:           tableInfo,
+//         reservations:   tableReservations,
+//         initialDate:    _selectedDay,       // the date tapped or chosen
+//         initialCheckIn: _fmt24(_start),     // e.g. "18:30"
+//         initialCheckOut:_fmt24(_end),       // e.g. "20:00"
+//       ),
+//     ),
+//   );
+// }
+
+// void _onTap(Offset pos, Size size) {
+//   // 1) Un-project the tap from screen coords into the SVG’s coordinate space
+//   final Matrix4 inv = _controller.value.clone()..invert();
+//   final Offset viewPt = MatrixUtils.transformPoint(inv, pos);
+
+//   final double scale = math.min(size.width / _svgWidth, size.height / _svgHeight);
+//   final double dx    = (size.width  - _svgWidth  * scale) / 2;
+//   final double dy    = (size.height - _svgHeight * scale) / 2;
+
+//   final Offset svgPt = Offset(
+//     (viewPt.dx - dx) / scale,
+//     (viewPt.dy - dy) / scale,
+//   );
+
+//   // 2) Hit-test your table paths
+//   final int? tableId = _hitTable(svgPt);
+//   if (tableId == null) return;
+
+//   // 3) Find the table record in your list
+//   final tableInfo = _tables.firstWhere(
+//     (t) => t['numTable'] == tableId,
+//     orElse: () => <String, dynamic>{},
+//   );
+//   if (tableInfo.isEmpty) return;  // no such table
+
+//   // 4) Filter that table’s reservations (you already have _reservations for the date)
+//   final tableReservations = _reservations
+//       .where((r) => r['numTable'] == tableId)
+//       .toList();
+
+//   // 5) Push your full‐screen reservation page, passing along
+//   //    the date & times the user already picked:
+//   Navigator.of(context).push(
+//     MaterialPageRoute(
+//       fullscreenDialog: true,
+//       builder: (_) => OpenSpaceReservationScreen(
+//         room: tableInfo,
+//         reservations: tableReservations,
+//         initialDate:      selectedDate,
+//         initialCheckIn:   checkInTime,
+//         initialCheckOut:  checkOutTime,
+//       ),
+//     ),
+//   );
+// }
+
+// void _onTap(Offset pos, Size size) {
+//   // 1) Un-project screen tap into SVG coords
+//   final Matrix4 inv = _controller.value.clone()..invert();
+//   final Offset viewPt = MatrixUtils.transformPoint(inv, pos);
+
+//   // 2) Apply same scale/translate you use in paint()
+//   final double scale = math.min(size.width / _svgWidth, size.height / _svgHeight);
+//   final double dx    = (size.width  - _svgWidth  * scale) / 2;
+//   final double dy    = (size.height - _svgHeight * scale) / 2;
+//   final Offset svgPt = Offset(
+//     (viewPt.dx - dx) / scale,
+//     (viewPt.dy - dy) / scale,
+//   );
+
+//   // 3) Hit-test your table paths
+//   final int? tableId = _hitTable(svgPt);
+//   if (tableId == null) return;
+
+//   // 4) Look up that table record
+//   final tableInfo = _tables.firstWhere(
+//     (t) => t['numTable'] == tableId,
+//     orElse: () => <String, dynamic>{},
+//   );
+//   if (tableInfo.isEmpty) return;
+
+//   // 5) Gather just that table’s reservations
+//   final tableReservations = _reservations.where((r) => r['numTable'] == tableId).toList();
+
+//   // 6) Push the full-screen reservation page, passing along
+//   //    the already-picked date & times:
+//   Navigator.of(context).push(
+//     MaterialPageRoute(
+//       fullscreenDialog: true,
+//       builder: (_) => OpenSpaceReservationScreen(
+//         room:            tableInfo,
+//         reservations:    tableReservations,
+//         initialDate:     _selectedDay,
+//         initialCheckIn:  _fmt24(_start),
+//         initialCheckOut: _fmt24(_end),
+//       ),
+//     ),
+//   );
+// }
+
+void _onTap(Offset pos, Size size) {
+  // 1) Un-project the tap from screen coords into the InteractiveViewer’s coordinate space
+  final Matrix4 inv = _controller.value.clone()..invert();
+  final Offset viewPt = MatrixUtils.transformPoint(inv, pos);
+
+  // 2) Compute the same scale & translation you use when painting the SVG
+  final double scale = math.min(size.width / _svgWidth, size.height / _svgHeight);
+  final double dx    = (size.width  - _svgWidth  * scale) / 2;
+  final double dy    = (size.height - _svgHeight * scale) / 2;
+
+  // 3) Map into raw SVG coordinates
+  final Offset svgPt = Offset(
+    (viewPt.dx - dx) / scale,
+    (viewPt.dy - dy) / scale,
+  );
+
+  // 4) Hit-test to see if we tapped inside any table path
+  final int? tableId = _hitTable(svgPt);
+  if (tableId == null) return;
+
+  // 5) Look up the full table record
+  final tableInfo = _tables.firstWhere(
+    (t) => t['numTable'] == tableId,
+    orElse: () => <String, dynamic>{},
+  );
+  if (tableInfo.isEmpty) return;
+
+  // 6) Gather just that table’s reservations
+  final tableReservations = _reservations
+      .where((r) => r['numTable'] == tableId)
+      .toList();
+
+  // 7) Push the full-screen reservation page, passing along the selected date & times
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => OpenSpaceReservationScreen(
+        room:            tableInfo,
+        reservations:    tableReservations,
+        initialDate:     _selectedDay,
+        initialCheckIn:  _fmt24(_start),
+        initialCheckOut: _fmt24(_end),
+      ),
+    ),
+  );
+}
+
+
+
+
+
+
+
+
+
+
 
   void _showDialog(int id) {
     showDialog(
@@ -547,6 +1034,26 @@ class _FloorPlanBookingPageState extends State<FloorPlanBookingPage> {
     );
   }
 
+  // Widget _buildFloorPlan() {
+  //   return LayoutBuilder(
+  //     builder: (ctx, bc) => GestureDetector(
+  //       onTapDown: (d) => _onTap(d.localPosition, bc.biggest),
+  //       child: InteractiveViewer(
+  //         transformationController: _controller,
+  //         minScale: 0.5,
+  //         maxScale: 4.0,
+  //         child: Center(
+  //           child: SizedBox(
+  //             width: bc.maxWidth,
+  //             height: bc.maxHeight,
+  //             child: SvgPicture.string(rawSvg, fit: BoxFit.contain),
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
+
   Widget _buildFloorPlan() {
     return LayoutBuilder(
       builder: (ctx, bc) => GestureDetector(
@@ -559,7 +1066,22 @@ class _FloorPlanBookingPageState extends State<FloorPlanBookingPage> {
             child: SizedBox(
               width: bc.maxWidth,
               height: bc.maxHeight,
-              child: SvgPicture.string(rawSvg, fit: BoxFit.contain),
+              child: Stack(
+                children: [
+                  // 1) your floor-plan SVG
+                  SvgPicture.string(rawSvg, fit: BoxFit.contain),
+
+                  // 2) the red overlays for reserved tables
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _TableHighlightPainter(
+                        _tablePaths,
+                        _tableInConflict,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -567,90 +1089,347 @@ class _FloorPlanBookingPageState extends State<FloorPlanBookingPage> {
     );
   }
 
-  void _pickDateTime() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          Widget timeDrop(
-              String label, TimeOfDay value, ValueChanged<TimeOfDay> cb) {
-            final slots = List.generate(33, (i) {
-              final h = 8 + i ~/ 2;
-              final m = (i % 2) * 30;
-              return TimeOfDay(hour: h, minute: m);
-            });
-            return Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label),
-                  DropdownButton<TimeOfDay>(
-                    isExpanded: true,
-                    value: value,
-                    underline: const SizedBox(),
-                    items: slots
-                        .map((t) => DropdownMenuItem(
-                              value: t,
-                              child: Text(MaterialLocalizations.of(context)
-                                  .formatTimeOfDay(t,
-                                      alwaysUse24HourFormat: true)),
-                            ))
-                        .toList(),
-                    onChanged: (t) {
-                      if (t == null) return;
-                      cb(t);
-                      setSheetState(() {});
-                    },
-                  )
-                ],
-              ),
-            );
-          }
+  // void _pickDateTime() {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     isScrollControlled: true,
+  //     shape: const RoundedRectangleBorder(
+  //         borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+  //     builder: (ctx) => StatefulBuilder(
+  //       builder: (ctx, setSheetState) {
+  //         Widget timeDrop(
+  //             String label, TimeOfDay value, ValueChanged<TimeOfDay> cb) {
+  //           final slots = List.generate(33, (i) {
+  //             final h = 8 + i ~/ 2;
+  //             final m = (i % 2) * 30;
+  //             return TimeOfDay(hour: h, minute: m);
+  //           });
+  //           return Expanded(
+  //             child: Column(
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 Text(label),
+  //                 DropdownButton<TimeOfDay>(
+  //                   isExpanded: true,
+  //                   value: value,
+  //                   underline: const SizedBox(),
+  //                   items: slots
+  //                       .map((t) => DropdownMenuItem(
+  //                             value: t,
+  //                             child: Text(MaterialLocalizations.of(context)
+  //                                 .formatTimeOfDay(t,
+  //                                     alwaysUse24HourFormat: true)),
+  //                           ))
+  //                       .toList(),
+  //                   onChanged: (t) {
+  //                     if (t == null) return;
+  //                     cb(t);
+  //                     setSheetState(() {});
+  //                   },
+  //                 )
+  //               ],
+  //             ),
+  //           );
+  //         }
 
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 20,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            ),
+  //         return Padding(
+  //           padding: EdgeInsets.only(
+  //             left: 20,
+  //             right: 20,
+  //             top: 20,
+  //             bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+  //           ),
+  //           child: Column(
+  //             mainAxisSize: MainAxisSize.min,
+  //             children: [
+  //               TableCalendar(
+  //                 firstDay: DateTime.now(),
+  //                 lastDay: DateTime.now().add(const Duration(days: 365)),
+  //                 focusedDay: _focusedDay,
+  //                 calendarFormat: _calendarFmt,
+  //                 selectedDayPredicate: (d) => isSameDay(d, _selectedDay),
+  //                 onDaySelected: (d, f) => setSheetState(() {
+  //                   _selectedDay = d;
+  //                   _focusedDay = f;
+  //                 }),
+  //                 onFormatChanged: (f) => setSheetState(() => _calendarFmt = f),
+  //               ),
+  //               const SizedBox(height: 16),
+  //               Row(children: [
+  //                 timeDrop('Start', _start, (t) => _start = t),
+  //                 const SizedBox(width: 12),
+  //                 timeDrop('End', _end, (t) => _end = t),
+  //               ]),
+  //               const SizedBox(height: 20),
+  //               ElevatedButton(
+  //                 onPressed: () {
+  //                   Navigator.pop(ctx);
+  //                   setState(() {});
+  //                 },
+  //                 child: const Text('Apply'),
+  //               )
+  //             ],
+  //           ),
+  //         );
+  //       },
+  //     ),
+  //   );
+  // }
+
+//   void _pickDateTime() {
+//   showModalBottomSheet(
+//     context: context,
+//     isScrollControlled: true,
+//     shape: const RoundedRectangleBorder(
+//       borderRadius: BorderRadius.vertical(top: Radius.circular(16))
+//     ),
+//     builder: (ctx) => StatefulBuilder(
+//       builder: (ctx, setSheetState) {
+//         // 1) round “now” up to next half-hour in Tunisia
+//         final nowTunisia = DateTime.now().toUtc().add(const Duration(hours: 1));
+//         final nextSlot  = _roundUpToNextSlot(nowTunisia);
+
+//         // 2) build full half-hour list from 08:00 to 23:30
+//         final allSlots = List<TimeOfDay>.generate(33, (i) {
+//           final h = 8 + i ~/ 2;
+//           final m = (i % 2) * 30;
+//           return TimeOfDay(hour: h, minute: m);
+//         });
+
+//         // 3) filter for “Start” slots >= nextSlot
+//         final startSlots = allSlots.where((t) {
+//           final mins = t.hour * 60 + t.minute;
+//           final cutoff = nextSlot.hour * 60 + nextSlot.minute;
+//           return mins >= cutoff;
+//         }).toList();
+
+//         // 4) filter for “End” slots >= start + 60 minutes
+//         final startMins = _start.hour * 60 + _start.minute;
+//         final endSlots = allSlots.where((t) {
+//           final mins = t.hour * 60 + t.minute;
+//           return mins >= startMins + 60;
+//         }).toList();
+
+//         Widget timeDrop(
+//           String label,
+//           TimeOfDay value,
+//           ValueChanged<TimeOfDay> onChanged,
+//         ) {
+//           final items = (label == 'Start') ? startSlots : endSlots;
+//           return Expanded(
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Text(label),
+//                 DropdownButton<TimeOfDay>(
+//                   isExpanded: true,
+//                   value: value,
+//                   underline: const SizedBox(),
+//                   items: items.map((t) {
+//                     return DropdownMenuItem(
+//                       value: t,
+//                       child: Text(
+//                         MaterialLocalizations.of(context)
+//                           .formatTimeOfDay(t, alwaysUse24HourFormat: true),
+//                       ),
+//                     );
+//                   }).toList(),
+//                   onChanged: (t) {
+//                     if (t == null) return;
+//                     // when start changes, reset end to at least start+1h
+//                     if (label == 'Start') {
+//                       _start = t;
+//                       // recompute end so it stays at least +60 min
+//                       final newEndMins = t.hour*60 + t.minute + 60;
+//                       _end = TimeOfDay(
+//                         hour: (newEndMins ~/ 60) % 24,
+//                         minute: newEndMins % 60,
+//                       );
+//                     } else {
+//                       _end = t;
+//                     }
+//                     onChanged(t);
+//                     setSheetState(() {});
+//                   },
+//                 ),
+//               ],
+//             ),
+//           );
+//         }
+
+//         return Padding(
+//           padding: EdgeInsets.only(
+//             left: 20,
+//             right: 20,
+//             top: 20,
+//             bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+//           ),
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               TableCalendar(
+//                 firstDay: DateTime.now(),
+//                 lastDay: DateTime.now().add(const Duration(days: 365)),
+//                 focusedDay: _focusedDay,
+//                 calendarFormat: _calendarFmt,
+//                 selectedDayPredicate: (d) => isSameDay(d, _selectedDay),
+//                 onDaySelected: (d, f) => setSheetState(() {
+//                   _selectedDay = d;
+//                   _focusedDay  = f;
+//                 }),
+//                 onFormatChanged: (f) => setSheetState(() => _calendarFmt = f),
+//               ),
+//               const SizedBox(height: 16),
+//               Row(
+//                 children: [
+//                   timeDrop('Start', _start,  (t) => _start  = t),
+//                   const SizedBox(width: 12),
+//                   timeDrop('End',   _end,    (t) => _end    = t),
+//                 ],
+//               ),
+//               const SizedBox(height: 20),
+//               ElevatedButton(
+//                 onPressed: () {
+//                   Navigator.pop(ctx);
+//                   setState(() {});
+//                 },
+//                 child: const Text('Apply'),
+//               )
+//             ],
+//           ),
+//         );
+//       },
+//     ),
+//   );
+// }
+
+void _pickDateTime() {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setSheetState) {
+        // 1) get “now” in Tunisia
+        final nowTunisia = DateTime.now().toUtc().add(const Duration(hours: 1));
+        // 2) round up if we’re on today
+        final isToday = isSameDay(_selectedDay, nowTunisia);
+        final firstSlot = isToday
+          ? _roundUpToNextSlot(nowTunisia)
+          : const TimeOfDay(hour: 8, minute: 0);
+
+        // 3) build all half-hour slots from 08:00 to 23:30
+        final allSlots = List<TimeOfDay>.generate(32, (i) {
+          final minutes = 8 * 60 + i * 30;
+          return TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
+        });
+
+        // 4) filter Start slots ≥ firstSlot
+        final startCutoff = firstSlot.hour * 60 + firstSlot.minute;
+        final startSlots = allSlots.where((t) {
+          final mins = t.hour * 60 + t.minute;
+          return mins >= startCutoff;
+        }).toList();
+
+        // 5) filter End slots to be at least 60 min after the chosen _start
+        final startMins = _start.hour * 60 + _start.minute;
+        final endSlots = allSlots.where((t) {
+          final mins = t.hour * 60 + t.minute;
+          return mins >= startMins + 60;
+        }).toList();
+
+        Widget timeDrop(
+          String label,
+          TimeOfDay value,
+          ValueChanged<TimeOfDay> onChanged,
+        ) {
+          final items = (label == 'Start') ? startSlots : endSlots;
+          return Expanded(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TableCalendar(
-                  firstDay: DateTime.now(),
-                  lastDay: DateTime.now().add(const Duration(days: 365)),
-                  focusedDay: _focusedDay,
-                  calendarFormat: _calendarFmt,
-                  selectedDayPredicate: (d) => isSameDay(d, _selectedDay),
-                  onDaySelected: (d, f) => setSheetState(() {
-                    _selectedDay = d;
-                    _focusedDay = f;
-                  }),
-                  onFormatChanged: (f) => setSheetState(() => _calendarFmt = f),
-                ),
-                const SizedBox(height: 16),
-                Row(children: [
-                  timeDrop('Start', _start, (t) => _start = t),
-                  const SizedBox(width: 12),
-                  timeDrop('End', _end, (t) => _end = t),
-                ]),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    setState(() {});
+                Text(label),
+                DropdownButton<TimeOfDay>(
+                  isExpanded: true,
+                  value: value,
+                  underline: const SizedBox(),
+                  items: items.map((t) {
+                    return DropdownMenuItem(
+                      value: t,
+                      child: Text(
+                        MaterialLocalizations.of(context)
+                          .formatTimeOfDay(t, alwaysUse24HourFormat: true),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (t) {
+                    if (t == null) return;
+                    if (label == 'Start') {
+                      _start = t;
+                      // ensure _end is at least +60min
+                      final newEnd = (_start.hour * 60 + _start.minute + 60);
+                      _end = TimeOfDay(
+                        hour: (newEnd ~/ 60) % 24,
+                        minute: newEnd % 60,
+                      );
+                    } else {
+                      _end = t;
+                    }
+                    onChanged(t);
+                    setSheetState(() {});
                   },
-                  child: const Text('Apply'),
-                )
+                ),
               ],
             ),
           );
-        },
-      ),
-    );
-  }
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TableCalendar(
+                firstDay: DateTime.now(),
+                lastDay: DateTime.now().add(const Duration(days: 365)),
+                focusedDay: _focusedDay,
+                calendarFormat: _calendarFmt,
+                selectedDayPredicate: (d) => isSameDay(d, _selectedDay),
+                onDaySelected: (d, f) => setSheetState(() {
+                  _selectedDay = d;
+                  _focusedDay  = f;
+                }),
+                onFormatChanged: (f) => setSheetState(() => _calendarFmt = f),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  timeDrop('Start', _start, (t) => _start = t),
+                  const SizedBox(width: 12),
+                  timeDrop('End',   _end,   (t) => _end   = t),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() {});
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
 }
